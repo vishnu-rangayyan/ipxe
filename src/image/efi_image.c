@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/features.h>
 #include <ipxe/uri.h>
 #include <ipxe/console.h>
+#include <ipxe/tpm.h>
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 
@@ -199,6 +200,11 @@ static int efi_image_exec ( struct image *image ) {
 		goto err_image_path;
 	}
 
+	rc = tpm_init ( );
+	if ( rc ) {
+		DBGC ( image, "tpm init failed %d\n", rc );
+	}
+
 	/* Create command line for image */
 	cmdline = efi_image_cmdline ( image );
 	if ( ! cmdline ) {
@@ -216,6 +222,24 @@ static int efi_image_exec ( struct image *image ) {
 		       "%s\n", image->name, strerror ( rc ) );
 		goto err_shim_install;
 	}
+
+	rc = tpm_measure ( (uint8_t *)user_to_phys( image->data, 0 ), image->len,
+			   TPM_PCR_KERNEL, (uint8_t *)image->name );
+	if ( rc == 0 ) {
+		rc = tpm_separator ( TPM_PCR_KERNEL );
+        rc = tpm_measure ( (uint8_t *)user_to_phys((userptr_t)cmdline, 0),
+				   ( ( wcslen ( cmdline ) + 1 /* NUL */)
+				   * sizeof ( wchar_t ) ),
+				   TPM_PCR_KERNEL_ARGS, (uint8_t *)cmdline );
+		if ( rc == 0 ) {
+			rc = tpm_separator ( TPM_PCR_KERNEL_ARGS );
+		} else {
+			DBGC( image, "%s: failed to measure kernel cmdline to pcr 0x%x\n", __FUNCTION__, TPM_PCR_KERNEL_ARGS );
+		}
+	} else {
+		DBGC ( image, "%s: failed to measure kernel %s at %p len 0x%x to pcr 0x%x\n", __FUNCTION__, image->name, (void *)image->data, image->len, TPM_PCR_KERNEL );
+    }
+	tpm_exit ( );
 
 	/* Attempt loading image */
 	handle = NULL;

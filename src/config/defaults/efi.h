@@ -48,6 +48,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	USB_EFI			/* Provide EFI_USB_IO_PROTOCOL interface */
 #define USB_BLOCK		/* USB block devices */
 
+#define TPM_EFI			/* Provide EFI TPM 1.2 and 2.0 interface */
+
 #define	REBOOT_CMD		/* Reboot command */
 
 #define EFI_SETTINGS		/* EFI variable settings */
